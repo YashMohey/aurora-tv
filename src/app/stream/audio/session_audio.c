@@ -52,11 +52,19 @@ static int aud_init(int audioConfiguration, const POPUS_MULTISTREAM_CONFIGURATIO
                          opusConfig->mapping[0], opusConfig->mapping[1], opusConfig->mapping[2],
                          opusConfig->mapping[3], opusConfig->mapping[4], opusConfig->mapping[5]);
     }
+    if (opusConfig->channelCount == 8) {
+        commons_log_info("Session", "Opus 7.1 from host: streams=%d coupled=%d mapping=[%u,%u,%u,%u,%u,%u,%u,%u]",
+                         opusConfig->streams, opusConfig->coupledStreams,
+                         opusConfig->mapping[0], opusConfig->mapping[1], opusConfig->mapping[2],
+                         opusConfig->mapping[3], opusConfig->mapping[4], opusConfig->mapping[5],
+                         opusConfig->mapping[6], opusConfig->mapping[7]);
+    }
     int pcm_layout = SURROUND_51_PASSTHROUGH;
 #if TARGET_WEBOS
     /* Opt-in escape hatch (#80): NDL Opus 5.1 cuts out on some eARC bars while PCM does not.
      * Passthrough stays the default because it is the verified 5.1 speaker mapping. */
-    if (opusConfig->channelCount == 6 && app_configuration != NULL) {
+    /* 7.1 is experimental and shares the switch: neither path is verified on a device yet. */
+    if ((opusConfig->channelCount == 6 || opusConfig->channelCount == 8) && app_configuration != NULL) {
         pcm_layout = app_configuration->surround_51_mode;
     }
 #endif
@@ -77,7 +85,9 @@ static int aud_init(int audioConfiguration, const POPUS_MULTISTREAM_CONFIGURATIO
          * reorders the PCM for free. */
         unsigned char mapping[AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT];
         memcpy(mapping, opusConfig->mapping, sizeof(mapping));
-        if (pcm_layout == SURROUND_51_PCM) {
+        if (pcm_layout == SURROUND_51_PCM && opusConfig->channelCount == 8) {
+            commons_log_info("Session", "7.1 decoded in client, PCM in WAVE order FL FR C LFE RL RR SL SR");
+        } else if (pcm_layout == SURROUND_51_PCM) {
             /* NDL slots FL RR FR RL C LFE, from WAVE FL(0) FR(1) C(2) LFE(3) RL(4) RR(5). */
             mapping[0] = opusConfig->mapping[0];
             mapping[1] = opusConfig->mapping[5];
